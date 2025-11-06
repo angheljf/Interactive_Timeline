@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Implementation Timeline</title>
+  <style>
+/* Implementation Timeline Styles */
+:root{
+  --bg: #0b1020;
+  --panel: #11162a;
+  --panel-2: #0e1426;
+  --text: #e6e8ee;
+  --muted: #a9afc3;
+  --line: #26304b;
+  --accent: #5b8cff;
+  --accent-2: #7aa2ff;
+  --in-progress: #d97706; /* amber-600 */
+  --upcoming: #2563eb;    /* blue-600 */
+  --past: #6b7280;        /* gray-500 */
+  --ongoing: #059669;     /* green-600 */
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --err: #ef4444;
+  --shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+*{ box-sizing: border-box; }
+html, body{
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(1200px 800px at 10% -20%, #10183a 0%, #0b1020 60%, #0b1020 100%);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+}
+
+.container{ max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+
+.app-header{
+  position: sticky; top: 0; z-index: 10;
+  background: linear-gradient(to bottom, rgba(11,16,32,0.95), rgba(11,16,32,0.8), transparent);
+  backdrop-filter: blur(6px);
+  padding: 18px 0 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.app-header h1{ margin: 0 0 6px; font-size: 24px; letter-spacing: 0.2px; }
+.today{ color: var(--muted); font-size: 14px; }
+.controls{ margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn{
+  appearance: none; border: 1px solid rgba(255,255,255,0.08); color: var(--text);
+  background: linear-gradient(180deg, #1a2240, #141a32);
+  padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.btn:hover{ border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
+.btn:active{ transform: translateY(0); }
+.btn-secondary{ background: #12182e; color: var(--muted); }
+.btn-link{ background: transparent; border: none; color: var(--accent-2); text-decoration: underline; }
+
+main{ padding: 24px 0 48px; }
+
+/* Gantt */
+.gantt{ margin-top: 12px; }
+.gantt-grid{ display: grid; grid-template-columns: 320px 1fr; gap: 8px; }
+.gantt-head{ display: contents; }
+.gantt-head-label{ color: var(--muted); padding: 0 8px; }
+.gantt-head-timeline{ position: relative; }
+.gantt-months{ display: grid; gap: 0; }
+.gantt-month{ text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 4px; border-left: 1px solid rgba(255,255,255,0.06); }
+.gantt-month:first-child{ border-left: none; }
+
+.gantt-rows{ display: contents; }
+.gantt-row{ display: contents; }
+.gantt-label{
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow);
+}
+.gantt-title{ margin: 0; font-size: 16px; }
+.phase-meta{ color: var(--muted); font-size: 13px; }
+.badges{ display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: 8px; }
+.badge{ font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); }
+.badge.in-progress{ background: rgba(217,119,6,0.15); color: #ffd18a; border-color: rgba(217,119,6,0.35); }
+.badge.upcoming{ background: rgba(37,99,235,0.15); color: #a7c4ff; border-color: rgba(37,99,235,0.35); }
+.badge.past{ background: rgba(107,114,128,0.15); color: #d1d5db; border-color: rgba(107,114,128,0.35); }
+.badge.ongoing{ background: rgba(5,150,105,0.15); color: #86efac; border-color: rgba(5,150,105,0.35); }
+
+.gantt-timeline{
+  position: relative; min-height: 46px; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden;
+  background: linear-gradient(180deg, #101633, #0e142a);
+}
+.gantt-month-grid{ position: absolute; inset: 0; display: grid; gap: 0; pointer-events: none; }
+.gantt-month-grid > div{ border-left: 1px solid rgba(255,255,255,0.06); }
+.gantt-month-grid > div:first-child{ border-left: none; }
+
+.gantt-today{ position: absolute; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, transparent, #7aa2ff 10%, #7aa2ff 90%, transparent); box-shadow: 0 0 0 2px rgba(122,162,255,0.2); }
+.gantt-bar{
+  position: absolute; height: 24px; top: 11px; border-radius: 6px; background: linear-gradient(90deg, #5b8cff, #7aa2ff);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.35), inset 0 0 8px rgba(122,162,255,0.5);
+}
+.gantt-bar.completed{ background: linear-gradient(90deg, #6b7280, #9aa3b2); }
+.gantt-bar.upcoming{ background: linear-gradient(90deg, #2563eb, #60a5fa); }
+.gantt-bar.ongoing{ background: linear-gradient(90deg, #059669, #34d399); }
+.gantt-bar-label{ position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #0b1020; font-weight: 600; white-space: nowrap; text-shadow: 0 1px 0 rgba(255,255,255,0.3); }
+
+.gantt-details{ display: contents; }
+.gantt-details-cell{
+  grid-column: 1 / -1; background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; margin-top: -2px; padding: 10px 12px; box-shadow: var(--shadow);
+}
+.details{ color: var(--muted); margin: 4px 0 8px; }
+.tasks{ margin: 6px 0 0 0; padding-left: 18px; }
+.tasks li{ margin: 6px 0; }
+.subtasks{ margin: 6px 0 0 16px; padding-left: 18px; }
+.collapse-toggle{ background: transparent; border: none; color: var(--accent-2); cursor: pointer; padding: 0; font-size: 14px; text-decoration: underline; }
+
+/* Milestones */
+.milestones{ margin-top: 40px; }
+.milestones h2{ margin-top: 0; }
+.milestones-list{ display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.milestone-card{
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px; padding: 12px; box-shadow: var(--shadow);
+}
+.milestone-date{ color: var(--muted); font-size: 14px; }
+
+/* Footer */
+.app-footer{ color: var(--muted); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px; }
+
+/* Noscript */
+.noscript{ background: #3b82f6; color: white; padding: 12px; border-radius: 6px; }
+
+@media (max-width: 600px){
+  .phase-header{ flex-direction: column; align-items: flex-start; }
+  .progress-label{ display: none; }
+}
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="container">
+      <h1>Implementation Timeline</h1>
+      <div class="today" id="today"></div>
+      <div class="controls">
+        <button id="expandAll" class="btn">Expand all</button>
+        <button id="collapseAll" class="btn btn-secondary">Collapse all</button>
+        <a href="#milestones" class="btn btn-link">Jump to Critical Milestones</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="gantt" class="gantt" aria-label="Gantt view of implementation timeline">
+      <!-- Gantt renders here -->
+    </section>
+
+    <section id="milestones" class="milestones" aria-labelledby="milestones-title">
+      <h2 id="milestones-title">Critical Milestones</h2>
+      <div id="milestonesList" class="milestones-list">
+        <!-- Milestones render here -->
+      </div>
+    </section>
+  </main>
+
+<script>
+// Implementation Timeline Renderer
+
+(function(){
+  const fmtMonthYear = (d) => d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  const fmtFull = (d) => d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const parse = (s) => s ? new Date(s + 'T00:00:00') : null; // simple, local time
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const addMonths = (date, months) => { const d = new Date(date); d.setMonth(d.getMonth() + months); return d; };
+  const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+  const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth()+1, 0);
+
+  const today = new Date();
+  const todayEl = document.getElementById('today');
+  if (todayEl) {
+    todayEl.textContent = `Today: ${today.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}`;
+  }
+
+  // Data model
+  const phases = [
+    {
+      id: 1,
+      title: 'Phase 1: Data Foundation',
+      start: parse('2025-11-01'),
+      end: parse('2026-01-31'),
+      description: 'The phased implementation approach ensures proper foundation building and allows for iterative feedback and improvement.',
+      tasks: [
+        { title: 'Data Cleaning', details: 'All program teams standardize and clean historical data' },
+        { title: 'Master Worksheets', details: 'Complete comprehensive data worksheets for each program' },
+        { title: 'SharePoint Setup', details: 'Establish folder structure and permission model' },
+        { title: 'Data Migration', details: 'Transfer master worksheets to SharePoint repository' },
+        { title: 'Validation', details: 'Verify data quality and completeness' },
+      ],
+      keyMilestone: { date: parse('2026-01-31'), label: 'All programs have clean, centralized data in SharePoint by January 31, 2026' }
+    },
+    {
+      id: 2,
+      title: 'Phase 2: Programs Dashboard Development',
+      start: parse('2026-02-01'),
+      end: parse('2026-04-30'),
+      tasks: [
+        { title: 'Power BI Setup', details: 'Configure Power Query connections to SharePoint' },
+        { title: 'Program Dashboards', details: 'Build department-specific dashboards following priority order', subitems: [
+          'ELC (complete existing build and review)',
+          'Pre-App & YouthBuild (convert master worksheet)',
+          'SYE/Career Bound (convert completed spreadsheet)',
+          '3DE (integrate existing dashboard)',
+          'CSC (build from new master spreadsheet)'
+        ]},
+        { title: 'Testing & Refinement', details: 'Review cycles with program teams and Myra' },
+        { title: 'Overview Dashboard', details: "Build Myra's main Programs Dashboard integrating all departments" },
+      ],
+      keyMilestone: { date: parse('2026-04-30'), label: 'All program dashboards operational by April 30, 2026' }
+    },
+    {
+      id: 3,
+      title: 'Phase 3: Student Hub Development',
+      start: parse('2026-03-01'),
+      end: parse('2026-05-31'),
+      tasks: [
+        { title: 'Requirements Finalization', details: 'Complete functional requirements and data dictionary' },
+        { title: 'GPT Configuration', details: 'Set up Custom GPT with instructions and privacy settings' },
+        { title: 'Knowledge Base', details: 'Generate and upload student data files for GPT consumption' },
+        { title: 'Testing', details: 'Validate accuracy of GPT responses against known queries' },
+        { title: 'Use Cases', details: 'Document common queries and expected responses' },
+      ],
+      keyMilestone: { date: parse('2026-05-31'), label: 'Student Hub operational with historical data by May 31, 2026' }
+    },
+    {
+      id: 4,
+      title: 'Phase 4: Training & Rollout',
+      start: parse('2026-06-01'),
+      end: parse('2026-07-31'),
+      tasks: [
+        { title: 'Documentation', details: 'Complete user guides, training materials, FAQs' },
+        { title: 'Pilot Testing', details: 'UAT (User Acceptance Testing) with select power users from each program' },
+        { title: 'Training Sessions', details: 'Conduct role-based training for all designated users' },
+        { title: 'Full Deployment', details: 'Launch both systems to all authorized users' },
+        { title: 'Support Structure', details: 'Establish help desk and ongoing support processes' },
+      ],
+      keyMilestone: { date: parse('2026-07-31'), label: 'Full organizational rollout by July 31, 2026' }
+    },
+    {
+      id: 5,
+      title: 'Phase 5: Optimization & Enhancement',
+      start: parse('2026-08-01'),
+      end: null, // August 2026+
+      tasks: [
+        { title: 'Feedback Collection', details: 'Gather user feedback and usage analytics' },
+        { title: 'Refinements', details: 'Address issues and implement improvements' },
+        { title: 'Performance Review', details: 'Evaluate success against defined criteria' },
+        { title: 'Enhancement Planning', details: 'Identify and prioritize new features' },
+        { title: 'Ongoing Maintenance', details: 'Regular data updates, security reviews, system optimization' },
+      ],
+      keyMilestone: null
+    }
+  ];
+
+  const criticalMilestones = [
+    { date: parse('2026-01-31'), label: 'Complete data foundation phase' },
+    { date: parse('2026-04-30'), label: 'All program dashboards operational' },
+    { date: parse('2026-05-31'), label: 'Student Hub deployed' },
+    { date: parse('2026-07-31'), label: 'Full organizational rollout complete' },
+  ].sort((a,b) => a.date - b.date);
+
+  function getStatus(phase){
+    const { start, end } = phase;
+    if (start && end){
+      if (today < start) return 'upcoming';
+      if (today > end) return 'past';
+      return 'in-progress';
+    }
+    // open-ended end
+    if (today < start) return 'upcoming';
+    return 'ongoing';
+  }
+  function statusLabel(key){
+    return ({'in-progress':'In Progress','upcoming':'Upcoming','past':'Completed','ongoing':'Ongoing'})[key] || key;
+  }
+  function dateRangeLabel(start, end){
+    if (start && end){
+      const s = fmtMonthYear(start), e = fmtMonthYear(end);
+      if (s === e) return s;
+      return `${s} – ${e}`;
+    }
+    if (start && !end){
+      return `${fmtMonthYear(start)}+`;
+    }
+    return '';
+  }
+  function buildScale(){
+    const starts = phases.map(p => p.start).filter(Boolean);
+    const ends = phases.map(p => p.end).filter(Boolean);
+    const minStart = starts.reduce((a,b) => a<b?a:b, starts[0]);
+    const latestFixedEnd = ends.length ? ends.reduce((a,b) => a>b?a:b, ends[0]) : addMonths(minStart, 6);
+    const anyOpenEnded = phases.some(p => !p.end);
+    const extraMonths = anyOpenEnded ? 4 : 0;
+    const chartStart = startOfMonth(minStart);
+    const chartEnd = endOfMonth(addMonths(latestFixedEnd, extraMonths));
+    // months array from chartStart 1st to chartEnd end
+    const months = [];
+    let cursor = startOfMonth(chartStart);
+    while (cursor <= chartEnd){
+      months.push(new Date(cursor));
+      cursor = startOfMonth(addMonths(cursor, 1));
+    }
+    return { chartStart, chartEnd, months };
+  }
+
+  function percentBetween(d, start, end){
+    const total = end - start;
+    if (total <= 0) return 0;
+    return clamp(((d - start) / total) * 100, 0, 100);
+  }
+
+  function render(){
+    const gantt = document.getElementById('gantt');
+    gantt.innerHTML = '';
+
+    const { chartStart, chartEnd, months } = buildScale();
+    // Helper to keep bar labels short (e.g., "Phase 1") while preserving full titles elsewhere
+    const getBarLabel = (phase, idx) => {
+      const m = /^Phase\s+(\d+)/i.exec(phase.title || '');
+      if (m) return `Phase ${m[1]}`;
+      if (Number.isInteger(phase.id)) return `Phase ${phase.id}`;
+      if (Number.isInteger(idx)) return `Phase ${idx + 1}`;
+      return phase.title || '';
+    };
+
+    const grid = document.createElement('div');
+    grid.className = 'gantt-grid';
+
+    // Header
+    const headLabel = document.createElement('div');
+    headLabel.className = 'gantt-head-label';
+    headLabel.textContent = 'Phases';
+    const headTimeline = document.createElement('div');
+    headTimeline.className = 'gantt-head-timeline';
+    const monthHeader = document.createElement('div');
+    monthHeader.className = 'gantt-months';
+    monthHeader.style.gridTemplateColumns = `repeat(${months.length}, 1fr)`;
+    months.forEach((m, idx) => {
+      const mm = document.createElement('div');
+      mm.className = 'gantt-month';
+      const label = m.toLocaleDateString(undefined, { month: 'short' }) + (m.getMonth()===0 || idx===0 ? ' ' + m.getFullYear() : '');
+      mm.textContent = label;
+      monthHeader.appendChild(mm);
+    });
+    headTimeline.appendChild(monthHeader);
+
+    grid.appendChild(headLabel);
+    grid.appendChild(headTimeline);
+
+    // Rows
+    phases.forEach((phase, i) => {
+      const status = getStatus(phase);
+      const displayEnd = phase.end ? phase.end : chartEnd;
+
+      const labelCell = document.createElement('div');
+      labelCell.className = 'gantt-label';
+      const title = document.createElement('h3');
+      title.className = 'gantt-title';
+      title.textContent = phase.title;
+      const meta = document.createElement('div');
+      meta.className = 'phase-meta';
+      meta.textContent = dateRangeLabel(phase.start, phase.end);
+      const badges = document.createElement('span');
+      badges.className = 'badges';
+      const statusEl = document.createElement('span');
+      statusEl.className = `badge ${status}`;
+      statusEl.textContent = statusLabel(status);
+      badges.appendChild(statusEl);
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'collapse-toggle';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.textContent = 'Show details';
+
+      labelCell.appendChild(title);
+      labelCell.appendChild(meta);
+      labelCell.appendChild(badges);
+      labelCell.appendChild(document.createTextNode(' '));
+      labelCell.appendChild(toggle);
+
+      const timelineCell = document.createElement('div');
+      timelineCell.className = 'gantt-timeline';
+      // month grid overlay
+      const monthGrid = document.createElement('div');
+      monthGrid.className = 'gantt-month-grid';
+      monthGrid.style.gridTemplateColumns = `repeat(${months.length}, 1fr)`;
+      months.forEach(() => monthGrid.appendChild(document.createElement('div')));
+      timelineCell.appendChild(monthGrid);
+
+      // today line
+      if (today >= chartStart && today <= chartEnd){
+        const todayLine = document.createElement('div');
+        todayLine.className = 'gantt-today';
+        todayLine.style.left = percentBetween(today, chartStart, chartEnd) + '%';
+        timelineCell.appendChild(todayLine);
+      }
+
+      // bar
+      const bar = document.createElement('div');
+      bar.className = 'gantt-bar ' + (status==='past'?'completed':status);
+      const left = percentBetween(phase.start, chartStart, chartEnd);
+      const right = percentBetween(displayEnd, chartStart, chartEnd);
+      const width = Math.max(0, right - left);
+      bar.style.left = left + '%';
+      bar.style.width = width + '%';
+  // Tooltip/accessible label retains the full information
+  bar.title = `${phase.title} — ${dateRangeLabel(phase.start, phase.end)}`;
+  bar.setAttribute('aria-label', `${phase.title} — ${dateRangeLabel(phase.start, phase.end)}`);
+      const label = document.createElement('div');
+      label.className = 'gantt-bar-label';
+  // Use short text to prevent overflow beyond the bar
+  label.textContent = getBarLabel(phase, i);
+      bar.appendChild(label);
+      timelineCell.appendChild(bar);
+
+      grid.appendChild(labelCell);
+      grid.appendChild(timelineCell);
+
+      // details row
+      const detailsRow = document.createElement('div');
+      detailsRow.className = 'gantt-details';
+      const detailsCell = document.createElement('div');
+      detailsCell.className = 'gantt-details-cell';
+      detailsCell.hidden = true;
+      const details = document.createElement('div');
+      details.className = 'details';
+      details.textContent = phase.description || '';
+      const ul = document.createElement('ul');
+      ul.className = 'tasks';
+      phase.tasks.forEach(t => {
+        const li = document.createElement('li');
+        const strong = document.createElement('strong');
+        strong.textContent = t.title + ':';
+        li.appendChild(strong);
+        if (t.details){ li.appendChild(document.createTextNode(' ' + t.details)); }
+        if (t.subitems && t.subitems.length){
+          const sub = document.createElement('ul');
+          sub.className = 'subtasks';
+          t.subitems.forEach(s => { const sli = document.createElement('li'); sli.textContent = s; sub.appendChild(sli); });
+          li.appendChild(sub);
+        }
+        ul.appendChild(li);
+      });
+      detailsCell.appendChild(details);
+      detailsCell.appendChild(ul);
+      if (phase.keyMilestone){
+        const km = document.createElement('div');
+        km.className = 'key-milestone';
+        km.innerHTML = `<b>Key Milestone:</b> ${phase.keyMilestone.label} <br /><span class="phase-meta">(${fmtFull(phase.keyMilestone.date)})</span>`;
+        detailsCell.appendChild(km);
+      }
+      detailsRow.appendChild(detailsCell);
+      grid.appendChild(detailsRow);
+
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        toggle.textContent = expanded ? 'Show details' : 'Hide details';
+        detailsCell.hidden = expanded;
+      });
+    });
+
+    gantt.appendChild(grid);
+
+    // Critical milestones
+    const mList = document.getElementById('milestonesList');
+    mList.innerHTML = '';
+    criticalMilestones.forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'milestone-card';
+      const date = document.createElement('div');
+      date.className = 'milestone-date';
+      date.textContent = fmtFull(m.date);
+      const label = document.createElement('div');
+      label.textContent = m.label;
+      card.appendChild(date);
+      card.appendChild(label);
+      mList.appendChild(card);
+    });
+  }
+
+  // Controls
+  document.getElementById('expandAll')?.addEventListener('click', () => {
+    document.querySelectorAll('.gantt-label .collapse-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.textContent = 'Hide details';
+    });
+    document.querySelectorAll('.gantt-details-cell').forEach(el => { el.hidden = false; });
+  });
+  document.getElementById('collapseAll')?.addEventListener('click', () => {
+    document.querySelectorAll('.gantt-label .collapse-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = 'Show details';
+    });
+    document.querySelectorAll('.gantt-details-cell').forEach(el => { el.hidden = true; });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
